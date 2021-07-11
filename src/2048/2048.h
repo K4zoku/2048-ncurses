@@ -16,53 +16,22 @@ typedef struct Board {
 
 Board *newBoard(int size);
 
-bool moveTiles(Board *
+bool moveTiles(Board *this, Direction direction);
 
-this,
-Direction direction
-);
+int getIndex(Board *this, int x, int y);
 
-int getIndex(Board *
+int getIndexByDirection(Board *this, int x, int y, Direction direction);
 
-this,
-int x,
-int y
-);
+bool cellAvailable(Board *this, int index);
 
-int getIndexByDirection(Board *
+bool cellsAvailable(Board *this);
 
-this,
-int x,
-int y, Direction
-direction);
+int *availableCells(Board *this, size_t *len);
 
-bool cellAvailable(Board *
+int randomAvailableCell(Board *this);
 
-this,
-int index
-);
+void addRandomTile(Board *this);
 
-bool cellsAvailable(Board *
+void addRandomTiles(Board *this, int n_tiles);
 
-this);
-
-int *availableCells(Board *
-
-this,
-size_t *len
-);
-
-int randomAvailableCell(Board *
-
-this);
-
-void addRandomTile(Board *
-
-this);
-
-void addRandomTiles(Board *
-
-this,
-int n_tiles
-);
 #endif
