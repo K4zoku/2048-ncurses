@@ -1,9 +1,10 @@
 #define _XOPEN_SOURCE_EXTENDED
 
-#include <ncursesw/ncurses.h>
+#include <curses.h>
 #include <wchar.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include "utils/common.h"
 #include "stages/menu.h"
 
@@ -34,15 +35,19 @@ void stageMenu(int *stage, __attribute__((unused)) GameSettings *settings) {
   for (;;) {
     reset();
     display(selected);
-    switch (wgetch(win)) {
+    next:;
+    switch (tolower(wgetch(win))) {
       case 0x1b:
+      case 'q':
         selected = 3;
         goto changeStage;
       case 'w':
+      case 'k':
       case KEY_UP:
         if (--selected < 0) selected = n_entries - 1;
         break;
       case 's':
+      case 'j':
       case KEY_DOWN:
         if (++selected == n_entries) selected = 0;
         break;
@@ -50,14 +55,19 @@ void stageMenu(int *stage, __attribute__((unused)) GameSettings *settings) {
       case KEY_ENTER:
       case KEY_RIGHT:
       case KEY_LEFT:
+      case 'h':
+      case 'l':
         goto changeStage;
       default:
-        continue;
+        goto next;
     }
   }
 
   changeStage:;
-  clear();
+  wclear(win);
+  wrefresh(win);
+  delwin(win);
+  win = NULL;
   switch (selected) {
     case 0:
       *stage = 2;
@@ -75,28 +85,30 @@ void stageMenu(int *stage, __attribute__((unused)) GameSettings *settings) {
 }
 
 static void reset() {
-  if (win) delwin(win);
-  clear();
-  refresh();
-  win = newwin(HEIGHT, WIDTH, center(LINES, HEIGHT), center(COLS, WIDTH));
-  keypad(win, TRUE);
+  if (!win) {
+    win = newwin(HEIGHT, WIDTH, center(LINES, HEIGHT), center(COLS, WIDTH));
+    keypad(win, TRUE);
+  }
+  wrefresh(win);
 }
 
 static void display(const int selected) {
   int i;
   box(win, 0, 0);
-  // mvwaddwstr(win, 0, 0,                  L"╭");
-  // mvwaddwstr(win, 0, WIDTH - 1,          L"╮");
-  // mvwaddwstr(win, HEIGHT - 1, 0,         L"╰");
-  // mvwaddwstr(win, HEIGHT - 1, WIDTH - 1, L"╯");
+  mvwaddwstr(win, 0, 0,                  L"╭");
+  mvwaddwstr(win, 0, WIDTH - 1,          L"╮");
+  mvwaddwstr(win, HEIGHT - 1, 0,         L"╰");
+  mvwaddwstr(win, HEIGHT - 1, WIDTH - 1, L"╯");
   wmove(win, 0, center(WIDTH, 8));
 
   waddch(win, ACS_RTEE);
   waddch(win, ' ');
+  wattron(win, A_REVERSE);
   waddch(win, '2' | COLOR_PAIR(1));
   waddch(win, '0' | COLOR_PAIR(2));
   waddch(win, '4' | COLOR_PAIR(3));
   waddch(win, '8' | COLOR_PAIR(4));
+  wattroff(win, A_REVERSE);
   waddch(win, ' ');
   waddch(win, ACS_LTEE);
 

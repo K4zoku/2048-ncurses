@@ -1,11 +1,12 @@
 #define _XOPEN_SOURCE_EXTENDED
 
-#include <ncursesw/ncurses.h>
+#include <curses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
 #include <stdbool.h>
 #include <time.h>
+#include <ctype.h>
 
 #include "utils/common.h"
 #include "stages/gameplay.h"
@@ -27,6 +28,8 @@ bool moveAvailable();
 
 bool isWin(const int winCondition);
 
+bool screenSize();
+
 Board *board;
 WINDOW *win;
 int width, height;
@@ -46,51 +49,64 @@ void stageGameplay(int *stage, GameSettings *settings) {
   *stage = 1;
   height = 2 * (window_padding + 1) + size * TILE_HEIGHT + (size + 1) * tile_margin;
   width = 2 * (window_padding + 1) * RATIO + size * TILE_WIDTH + (size + 1) * tile_margin * RATIO;
-  starty = center(LINES, height);
+  screenSize();
+  starty = center(LINES, height + 5);
   startx = center(COLS, width);
   clear();
   win = newwin(height, width, starty, startx);
-  scoreboard = newwin(5, 27, starty, startx + width + 2);
+  scoreboard = newwin(5, 27, starty - 5, startx);
   box(scoreboard, 0, 0);
+  mvwaddwstr(scoreboard, 0, 0,  L"╭");
+  mvwaddwstr(scoreboard, 0, 26, L"╮");
+  mvwaddwstr(scoreboard, 4, 0,  L"╰");
+  mvwaddwstr(scoreboard, 4, 26, L"╯");
   keypad(win, TRUE);
   nodelay(win, TRUE);
   wtimeout(win, 500);
-  wbkgd(win, COLOR_PAIR(8));
+  // wbkgd(win, COLOR_PAIR(8));
   box(win, 0, 0);
-  mvwprintw(scoreboard, 1, 1, "Score: %16llu", 0);
+  mvwaddwstr(win, 0, 0,                  L"╭");
+  mvwaddwstr(win, 0, width - 1,          L"╮");
+  mvwaddwstr(win, height - 1, 0,         L"╰");
+  mvwaddwstr(win, height - 1, width - 1, L"╯");
+  mvwprintw(scoreboard, 1, 1, "Score: ");
+  mvwprintw(scoreboard, 2, 1, "Moves: ");
+  mvwprintw(scoreboard, 3, 1, "Time elapsed: ");
   wrefresh(scoreboard);
 
   board = newBoard(size);
   addRandomTiles(board, 2);
 
   for (;;) {
+    if (!screenSize()) goto end;
     display();
-    mvwprintw(scoreboard, 1, 1, "Score: %16d", board->scores);
-    mvwprintw(scoreboard, 2, 1, "Moves: %16d", board->moves);
+    mvwprintw(scoreboard, 1, 8, "%16ld", board->scores);
+    mvwprintw(scoreboard, 2, 8, "%16d", board->moves);
+    mvwprintw(scoreboard, 3, 15, "%9s", elapsedTime(startTime));
     wrefresh(scoreboard);
-    ch = wgetch(win);
-    mvwprintw(scoreboard, 3, 1, "Time elapsed: %9s", elapsedTime(startTime));
-    wrefresh(scoreboard);
+    ch = tolower(wgetch(win));
+    // wrefresh(scoreboard);
     switch (ch) {
       case 0x1b:
+      case 'q':
         goto end;
       case 'w':
-      case 'W':
+      case 'k':
       case KEY_UP:
         direction = UP;
         break;
       case 'd':
-      case 'D':
+      case 'l':
       case KEY_RIGHT:
         direction = RIGHT;
         break;
       case 's':
-      case 'S':
+      case 'j':
       case KEY_DOWN:
         direction = DOWN;
         break;
       case 'a':
-      case 'A':
+      case 'h':  
       case KEY_LEFT:
         direction = LEFT;
         break;
@@ -101,27 +117,25 @@ void stageGameplay(int *stage, GameSettings *settings) {
         continue;
     }
     if (!keep && isWin(settings->winCondition)) {
-      sub = newwin(5, 31, center(LINES, 4), center(COLS, 27));
+      sub = derwin(win, 5, 29, center(height, 5), center(width, 29));
       box(sub, 0, 0);
-      mvwprintw(sub, 0, center(31, 9), " YOU WIN ");
-      mvwprintw(sub, 1, 2, "Press SPACE to continue");
-      mvwprintw(sub, 2, 2, "Press ENTER to restart");
-      mvwprintw(sub, 3, 2, "Press ESC to return to menu");
+      mvwprintw(sub, 0, center(29, 9), " YOU WIN ");
+      mvwprintw(sub, 1, 1, " Press SPACE to continue   ");
+      mvwprintw(sub, 2, 1, " Press ENTER to restart    ");
+      mvwprintw(sub, 3, 1, " Press Q to return to menu ");
       wrefresh(sub);
-      wrefresh(win);
-      wtimeout(win, -1);
       wwait:;
-      switch (wgetch(win)) {
+      switch (tolower(wgetch(win))) {
         case ' ':
           keep = true;
+          wclear(sub);
+          wrefresh(sub);
           delwin(sub);
-          wtimeout(win, 500);
-          wbkgd(win, COLOR_PAIR(8));
-          box(win, 0, 0);
           break;
         case '\n':
           *stage = 2;
         case 0x1b:
+        case 'q':
           goto end;
         default:
           goto wwait;
@@ -131,20 +145,21 @@ void stageGameplay(int *stage, GameSettings *settings) {
         addRandomTile(board);
       }
     } else {
-      sub = newwin(4, 31, center(LINES, 4), center(COLS, 27));
+      sub = derwin(win, 4, 29, center(height, 4), center(width, 29));
       box(sub, 0, 0);
-      mvwprintw(sub, 0, center(31, 10), " YOU LOSE ");
-      mvwprintw(sub, 1, 2, "Press ENTER to restart");
-      mvwprintw(sub, 2, 2, "Press ESC to return to menu");
+      mvwprintw(sub, 0, center(29, 10), " YOU LOSE ");
+      mvwprintw(sub, 1, 1, " Press ENTER to restart    ");
+      mvwprintw(sub, 2, 1, " Press Q to return to menu ");
       wrefresh(sub);
-      wrefresh(win);
-      wtimeout(win, -1);
       lwait:;
-      switch (wgetch(win)) {
+      switch (tolower(wgetch(win))) {
         case '\n':
+          wclear(sub);
+          wrefresh(sub);
           delwin(sub);
           *stage = 2;
         case 0x1b:
+        case 'q':
           goto end;
         default:
           goto lwait;
@@ -153,7 +168,14 @@ void stageGameplay(int *stage, GameSettings *settings) {
     }
   }
   end:;
+  wclear(scoreboard);
+  wrefresh(scoreboard);
+  delwin(scoreboard);
+  scoreboard = NULL;
+  wclear(win);
+  wrefresh(win);
   delwin(win);
+  win = NULL;
 }
 
 void display() {
@@ -162,13 +184,13 @@ void display() {
   int tile;
   for (x = 0; x < size; ++x)
     for (y = 0; y < size; ++y) {
-      tile = getIndex(board, x, y);
-      printTile(y, x, board->tiles[tile]);
+      tile = board->tiles[getIndex(board, x, y)];
+      printTile(y, x, tile);
     }
 }
 
 const uint colors[] = {
-    COLOR_PAIR(8),
+    COLOR_PAIR(7),
     COLOR_PAIR(1),
     COLOR_PAIR(2),
     COLOR_PAIR(3),
@@ -188,7 +210,7 @@ uint getColor(int value) {
 
 void printTile(int y, int x, int value) {
   uint color, i;
-  size_t padlen, len;
+  int padlen, len;
   // calculate real coordinate
   y = y * TILE_HEIGHT + (window_padding + 1) + (y + 1) * tile_margin;
   x = x * TILE_WIDTH + RATIO * (window_padding + 1) + (x + 1) * tile_margin * RATIO;
@@ -256,4 +278,32 @@ bool isWin(const int winCondition) {
       if (board->tiles[getIndex(board, x, y)] == winCondition) return true;
     }
   return false;
+}
+
+bool screenSize() {
+  int ch;
+  if (LINES >= height + 5 && COLS >= width) return true;
+  WINDOW * warn = newwin(LINES, COLS, 0, 0);
+  keypad(warn, TRUE);
+  nodelay(warn, TRUE);
+  wtimeout(warn, 100);
+  mvwprintw(warn, 0, 0, "Terminal size must be %dx%d or above\n", width, height + 7);
+  wprintw(warn, "Current terminal size: %dx%d", COLS, LINES);
+  wrefresh(warn);
+  while (LINES < height + 5 || COLS < width) {
+    mvwprintw(warn, 0, 0, "Terminal size must be %dx%d or above\n", width, height + 7);
+    wprintw(warn, "Current terminal size: %dx%d", COLS, LINES);
+    wrefresh(warn);
+    ch = tolower(getch());
+    if (ch == 0xb || ch == 'q') {
+      wclear(warn);
+      wrefresh(warn);
+      delwin(warn);
+      return false;
+    }
+  }
+  wclear(warn);
+  wrefresh(warn);
+  delwin(warn);
+  return true;
 }

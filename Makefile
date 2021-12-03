@@ -1,48 +1,41 @@
-CC :=gcc
-CCFLAGS :=-Wall -Wextra -Wnonnull -O2
-CC_LIBRARIES :=-lncursesw
-
-INSTALL_DIR:=bin
+CC:=gcc
+CCFLAGS:=-Wall -Wextra -Wnonnull
+CCLIBS:=-lm -lncursesw -ltinfo
+CCEXTRAS:=-fPIC -O2 -g
 SRC:=src
 INCLUDES:=src
 TARGET:=out
 OBJ:=obj
-BIN:=$(TARGET)/bin
+BIN:=bin
 
-CWD:=$(shell echo %cd%)
-SOURCES:=$(shell dir /b/d/s/a-d $(SRC)\*.c)
-SOURCES:=$(subst $(CWD)\,,$(SOURCES))
-SOURCES:=$(subst \,/,$(SOURCES))
-OBJECTS:=$(addprefix $(TARGET)/$(OBJ), $(subst $(SRC),,$(SOURCES:c=o)))
+SOURCES:=$(shell find $(SRC) -name '*.c')
+OBJECTS:=$(SOURCES:$(SRC)/%.c=$(OBJ)/%.o)
 
-all: clean package
+L_TARGET:=$(TARGET)/linux
+L_BIN:=$(L_TARGET)/$(BIN)
+L_OBJECTS:=$(addprefix $(L_TARGET)/, $(OBJECTS))
+
+MAKELISTS:=$(patsubst %.c,%,$(subst $(PWD)/$(SRC)/,,$(SOURCES)))
+
+default: clean compile
 
 clean:
-	@echo Cleaning...
-	@rm -rf $(TARGET)
-	@rm -f $(INSTALL_DIR)\2048.exe
-	@rm -f $(INSTALL_DIR)\2048.zip
+	rm -rf $(L_BIN)/*
+	rm -rf $(L_OBJECTS)/*
 
-prepare:
-	@echo Preparing...
-	@for %%d in ($(subst $(SRC),$(TARGET)/$(OBJ),$(shell dir /b/d/s/ad $(SRC)))) \
-		do if not exist %%d ( md "%%d" )
-	@if not exist $(BIN) ( md "$(BIN)" )
+compile: $(L_OBJECTS)
+	mkdir -p $(L_BIN)
+	$(CC) -I$(INCLUDES) $(CCFLAGS) $^ -o $(L_BIN)/2048 $(CCLIBS) $(CCEXTRAS)
 
-$(TARGET)/$(OBJ)/%.o: $(SRC)/%.c
-	@echo Compiling $<
-	@$(CC) -I$(INCLUDES) $(CCFLAGS) -c $< -o $@ $(CC_LIBRARIES)
+$(TARGET)/linux/$(OBJ)/%.o: $(SRC)/%.c
+	mkdir -p $$(dirname $@)
+	$(CC) -I$(INCLUDES) $(CCFLAGS) -c $< -o $@ $(CCLIBS) $(CCEXTRAS)
 
-compile: $(OBJECTS)
-	@$(CC) -I$(INCLUDES) $(CCFLAGS) $^ -o $(BIN)\2048.exe $(CC_LIBRARIES)
+install: compile
+	mkdir -p /opt/2048
+	cp -uf $(L_BIN)/2048 /opt/2048/
+	ln -sf /opt/2048/2048 /usr/bin/
 
-package: prepare compile
-	@echo Packaging...
-	@if not exist $(INSTALL_DIR) ( md $(INSTALL_DIR) )
-	@cp -f $(BIN)\2048.exe $(INSTALL_DIR)\2048.exe
-	@cp -u lib\libncursesw6.dll $(INSTALL_DIR)\libncursesw6.dll
-	@zip -q -9 bin\2048.zip bin\2048.exe lib\libncursesw6.dll
-
-run: package
-	@echo Running...
-	$(INSTALL_DIR)\2048.exe
+uninstall: 
+	rm -rf /opt/2048
+	rm -f /usr/bin/2048
