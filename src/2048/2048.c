@@ -27,28 +27,13 @@ int getIndex(Board *this, int x, int y) {
 }
 
 int getIndexByDirection(Board *this, int x, int y, Direction direction) {
-  int size, fullSize, result;
+  int edge, area, result, a, b;
   if (!withinBound(this, x, y)) return -1;
-  size = this->size;
-  fullSize = size * size - 1;
-  switch (direction) {
-    case LEFT:
-      result = x + y * size;
-      break;
-    case RIGHT:
-      result = fullSize - (x + y * size);
-      break;
-    case UP:
-      result = y + x * size;
-      break;
-    case DOWN:
-      result = fullSize - (y + x * size);
-      break;
-    default:
-      // HOW THE F***?
-      result = -1;
-      break;
-  }
+  edge = this->size;
+  area = edge * edge - 1;
+  a = (direction >> 1) & 1;
+  b = direction & 1;
+  result = (1 - 2 * a) * (x * (edge * b - b + 1) + b * y + edge * y * (1 - b)) + a * area;
   return withinBounds(this, result) ? result : -1;
 }
 

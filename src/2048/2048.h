@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 typedef enum {
-    UP, DOWN, LEFT, RIGHT
+    LEFT=0, UP=1, RIGHT=2, DOWN=3
 } Direction;
 
 typedef struct Board {
